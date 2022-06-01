@@ -34,7 +34,10 @@ exports.scan = async (req, res) => {
  */
 exports.getData = async (req, res) => {
   try {
-    const scannedData = await Scanner.find({ userId: req.user._id });
+    const scannedData = await Scanner.find({ userId: req.user._id }).populate({
+      path: "userId",
+      select: "-password",
+    });
 
     return res.status(200).json({ scannedData });
   } catch (error) {
@@ -73,8 +76,8 @@ exports.claimInsurance = async (req, res) => {
       phoneNumber,
       packageContents,
       barcode,
+      buttons,
     } = req?.body;
-    console.log(req?.body);
     const insurance = await Scanner.findByIdAndUpdate(
       { _id: req.params.id },
       {
@@ -86,12 +89,18 @@ exports.claimInsurance = async (req, res) => {
         sizeWeight,
         email,
         phoneNumber,
-        barcode,
         packageContents,
+        buttons,
         claim: true,
       },
       { upsert: true, new: true }
     );
+    setTimeout(async () => {
+      await Scanner.findByIdAndUpdate(
+        { _id: req.params.id },
+        { deleteButtonFlag: true } //Run After 8 Hours
+      );
+    }, 1000 * 3600 * 8);
     return res.status(200).json({ insurance });
   } catch (error) {
     console.log(error);
@@ -125,6 +134,50 @@ exports.uploadPhotos = async (req, res) => {
       }
     );
     return res.status(200).json({ message: "Photo Uplaoded Successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * Remove Claim Photos
+ * @param {Request} req - request object
+ * @param {Response} res - response object
+ */
+exports.removePhoto = async (req, res) => {
+  try {
+    const photo = req.body.photo;
+    await Scanner.findByIdAndUpdate(
+      { _id: req.params.id },
+      {
+        $pull: { productPhotos: photo },
+      }
+    );
+    return res.status(200).json({ message: "Photo Deleted Successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+exports.removeInsurance = async (req, res) => {
+  try {
+    const insurance = req.body.insurance;
+    await Scanner.findByIdAndUpdate(
+      { _id: req.params.id },
+      {
+        $pull: { buttons: insurance },
+      }
+    );
+    return res.status(200).json({ message: "Insurance Deleted Successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+exports.deleteInusrance = async (req, res) => {
+  try {
+    await Scanner.findByIdAndDelete(req.params.id);
+    return res.status(200).json({ message: "Barcode Deleted Successfully!" });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }

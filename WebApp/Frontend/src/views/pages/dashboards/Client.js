@@ -8,6 +8,10 @@ import {
   getScannedDataLoggedInUser,
   claimInsurance,
   uploadPhotos,
+  removePhoto,
+  removeInsuracne,
+  scanBarcode,
+  deleteBarcode,
 } from "../../../Axios/apiFunctions";
 import { css } from "@emotion/react";
 import HashLoader from "react-spinners/HashLoader";
@@ -22,8 +26,15 @@ import {
   Spin,
   Radio,
   Image,
+  Checkbox,
+  Row,
+  Col,
+  Popconfirm,
+  message,
 } from "antd";
-import { LoadingOutlined } from "@ant-design/icons";
+import { formattedDate } from "config/config";
+
+import { LoadingOutlined, DeleteOutlined } from "@ant-design/icons";
 
 function Dashboard() {
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -32,13 +43,29 @@ function Dashboard() {
   const [uploadFileList, setUploadFileList] = useState([]);
   const [uploading, setUploaing] = useState(false);
   const [uploadModalVisible, setUploadModalVisible] = useState(false);
-  const [productStatus, setProductStatus] = useState("");
+  const [selectedInsurance, setSelectedInsurance] = useState([]);
+  const [photosModalVisible, setPhotosModalVisible] = useState(false);
+  const [insuranceModal, setInsuranceModalVisible] = useState(false);
+  const [choosedInsurance, setChoosedInsurance] = useState({
+    id: "",
+    insurance: [],
+  });
+  const [barcodeBtnLoading, setBarcodeBtnLoading] = useState(false);
+  const [barcodeModalVisible, setBarcodeModalVisible] = useState(false);
+  const [barcode, setBarcode] = useState("");
+  const [showButton, setShowButton] = useState();
+
+  const [photos, setPhotos] = useState({
+    id: "",
+    photos: [],
+  });
   const [form] = Form.useForm();
 
   const { isLoading: dataLoading, data: scannedData } = useQuery(
     "getScannedDataOfLoggedInUser",
     () => getScannedDataLoggedInUser()
   );
+
   const queryClient = useQueryClient();
 
   const getDataMutation = useMutation(getScannedDataLoggedInUser, {
@@ -52,13 +79,23 @@ function Dashboard() {
       name: data.userId.fullName,
       email: data.userId.email,
       barcode: data.barcode,
-      buttons: data.buttons + ",",
+      buttons: (
+        <Button
+          key={index + "btn5"}
+          size='sm'
+          color='primary'
+          onClick={() =>
+            handleInsuranceModal(data._id, data.buttons, data.deleteButtonFlag)
+          }>
+          Choosed Insurances
+        </Button>
+      ),
       claim: (
         <Button
           key={index + "btn1"}
           size='sm'
           color='primary'
-          onClick={() => handleClaimInsurance(data._id, index)}>
+          onClick={() => handleClaimInsurance(data, index)}>
           Claim Insurance
         </Button>
       ),
@@ -71,14 +108,118 @@ function Dashboard() {
           Upload Photos
         </Button>
       ),
-      photos: data.productPhotos.map((photo, index) => {
-        return (
-          <Image.PreviewGroup key={index + "prImg"}>
-            <Image key={index + "Img"} width={50} height={50} src={photo} />
-          </Image.PreviewGroup>
-        );
-      }),
+      photos: (
+        <Button
+          key={index + "btn2"}
+          size='sm'
+          color='primary'
+          onClick={() => handleImagePreview(data._id, data.productPhotos)}>
+          View Photos
+        </Button>
+      ),
+      claimStatus:
+        data.claimStatus === "inProgress" ? (
+          <strong>
+            <span style={{ color: "blue" }}>IN PROGRESS</span>
+          </strong>
+        ) : data.claimStatus === "finished" ? (
+          <strong>
+            <span style={{ color: "green" }}>
+              {data.claimStatus.toUpperCase()}
+            </span>
+          </strong>
+        ) : (
+          <strong>
+            <span style={{ color: "red" }}>
+              {data.claimStatus.toUpperCase()}
+            </span>
+          </strong>
+        ),
+      scanDate: formattedDate(data.createdAt),
+      delete: (
+        <Popconfirm
+          key={index + "popconfirm"}
+          title='Are you sure to delete this entry?'
+          onConfirm={() => handleDeleteEntry(data._id)}
+          onCancel={handleCancelPopConfirm}
+          okText='Yes'
+          cancelText='No'>
+          <Button key={index + "btn2"} size='sm' color='danger'>
+            Delete
+          </Button>
+        </Popconfirm>
+      ),
     };
+  };
+
+  const handleCancelPopConfirm = () => {
+    console.log("Cancelled");
+  };
+
+  const handleDeleteEntry = async (id) => {
+    console.log(id);
+    const res = await deleteBarcode(id);
+    console.log(res);
+    if (res.status === 200) {
+      getDataMutation.mutate();
+      notification["success"]({
+        message: res?.data?.message,
+      });
+    } else {
+      notification["error"]({
+        message: "Something went wrong! Please check your internet connection",
+      });
+    }
+  };
+
+  const handleInsuranceModal = (id, insurance, deleteButtonFlag) => {
+    setInsuranceModalVisible(true);
+    setChoosedInsurance({
+      id: id,
+      insurance: insurance,
+    });
+    setShowButton(deleteButtonFlag);
+  };
+
+  const handleImagePreview = (id, photos) => {
+    setPhotos({
+      id: id,
+      photos: photos,
+    });
+
+    setPhotosModalVisible(true);
+  };
+
+  const handleDeletePhoto = async (id, photo) => {
+    const res = await removePhoto(id, photo);
+    if (res.status === 200) {
+      getDataMutation.mutate();
+      setPhotosModalVisible(false);
+      notification["success"]({
+        message: "Photo Deleted Successfully!",
+      });
+    } else {
+      setPhotosModalVisible(false);
+      notification["error"]({
+        message: "Something went wrong! Please check your internet connection",
+      });
+    }
+  };
+
+  const handleDeleteInsurance = async (insurance) => {
+    const res = await removeInsuracne(choosedInsurance.id, insurance);
+    if (res.status === 200) {
+      getDataMutation.mutate();
+      setInsuranceModalVisible(false);
+      notification["success"]({
+        message: "Insurance Deleted Successfully!",
+      });
+    } else {
+      setInsuranceModalVisible(false);
+      notification["error"]({
+        message: "Something went wrong! Please check your internet connection",
+      });
+    }
   };
 
   const onUploadModalCancel = () => {
@@ -116,7 +257,6 @@ function Dashboard() {
   };
 
   const beforeUpload = (file, fileList) => {
-    console.log(fileList);
     uploadFileList.push(file);
     setUploadFileList(uploadFileList);
     return false;
@@ -128,10 +268,9 @@ function Dashboard() {
     setUploadFileList(newFileList);
   };
 
-  const handleClaimInsurance = (_id, index) => {
+  const handleClaimInsurance = (data, index) => {
     setIsModalVisible(true);
-
-    setScannerId(_id);
+    setScannerId(data._id);
   };
   const handleUploadPhtotsMoal = (_id, index) => {
     setUploadModalVisible(true);
@@ -151,6 +290,8 @@ function Dashboard() {
     if (res.status === 200) {
       form.resetFields();
       setIsModalVisible(false);
+      getDataMutation.mutate();
+
       notification["success"]({
         message: "Insurance Claim Request Submitted Successfully",
       });
@@ -159,6 +300,34 @@ function Dashboard() {
 
   const onFinishFailed = (errorInfo) => {
     console.log("Failed:", errorInfo);
+  };
+
+  const handleAddBarcode = () => {
+    setBarcodeModalVisible(true);
+  };
+
+  const handleBarcodeModalOk = async () => {
+    setBarcodeBtnLoading(true);
+    const res = await scanBarcode(barcode, selectedInsurance);
+
+    if (res.status === 200) {
+      setBarcodeBtnLoading(false);
+
+      setBarcodeModalVisible(false);
+      getDataMutation.mutate();
+
+      notification["success"]({
+        message: "Barcode Added Successfully!",
+      });
+    } else {
+      setBarcodeBtnLoading(false);
+
+      setBarcodeModalVisible(false);
+
+      notification["error"]({
+        message: "Something went wrong! Please check your internet connection",
+      });
+    }
   };
 
   const columns = [
@@ -183,8 +352,23 @@ function Dashboard() {
       sort: true,
     },
     {
+      dataField: "claimStatus",
+      text: "Claim Status",
+      sort: true,
+    },
+    {
       dataField: "photos",
       text: "Photos",
+      sort: true,
+    },
+    {
+      dataField: "scanDate",
+      text: "Date",
+      sort: true,
+    },
+    {
+      dataField: "delete",
+      text: "Delete",
       sort: true,
     },
   ];
@@ -193,6 +377,9 @@ function Dashboard() {
     margin: 0 auto;
   `;
 
+  const handleCheckBox = (values) => {
+    setSelectedInsurance(values);
+  };
   return (
     <>
       <SimpleHeader name='Client' parentName='Table' />
@@ -205,6 +392,8 @@ function Dashboard() {
       {dataLoading || (
         <ReactBSTables
           columns={columns}
+          disabled={true}
+          handleAddBarcode={handleAddBarcode}
           dataTable={scannedData?.data?.scannedData?.map(barcodeData3)}
           name='Client'
           tableTitle='Scanned Barcode Data'
@@ -240,9 +429,24 @@ function Dashboard() {
           <Form.Item label='Track & Trace Code' name='code'>
             <Input placeholder='Enter Track & Trace Code' />
           </Form.Item>
-          <Form.Item label='Barcode' name='barcode'>
-            <Input placeholder='Enter Your Barcode' />
-          </Form.Item>
+          {/* <Form.Item label='Select Insurance' name='buttons'>
+            <Checkbox.Group>
+              <Row>
+                {assignedButtons.map((btn) => {
+                  return (
+                    <Col span={8}>
+                      <Checkbox
+                        value={btn.value}
+                        key={btn._id}
+                        style={{ lineHeight: "32px" }}>
+                        {btn.value}
+                      </Checkbox>
+                    </Col>
+                  );
+                })}
+              </Row>
+            </Checkbox.Group>
+          </Form.Item> */}
           <Form.Item label='Product Status' name='productStatus'>
             <Radio.Group value={"lost"}>
               <Radio value={"lost"}>Lost</Radio>
@@ -314,6 +518,124 @@ function Dashboard() {
               )}
             </span>
           </Button>
+        </div>
+      </Modal>
+      <Modal
+        title='All Photos'
+        visible={photosModalVisible}
+        // onOk={handleOk}
+        width={250}
+        onCancel={() => setPhotosModalVisible(false)}
+        footer={null}>
+        <div style={{ textAlign: "center" }}>
+          {photos.photos.map((photo, index) => {
+            return (
+              <div
+                key={index + "div"}
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  marginBottom: 15,
+                }}>
+                <Image.PreviewGroup key={index + "prImg"}>
+                  <Image
+                    key={index + "Img"}
+                    width={80}
+                    height={50}
+                    src={photo}
+                  />
+                  <Button
+                    style={{ marginLeft: 20 }}
+                    key={index + "btn3"}
+                    size='sm'
+                    outline
+                    color='danger'
+                    onClick={() => handleDeletePhoto(photos.id, photo)}>
+                    <DeleteOutlined />
+                  </Button>
+                </Image.PreviewGroup>
+              </div>
+            );
+          })}
+        </div>
+      </Modal>
+      <Modal
+        title='Choosed Insurances'
+        visible={insuranceModal}
+        // onOk={handleOk}
+        // width={250}
+        onCancel={() => setInsuranceModalVisible(false)}
+        footer={null}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            // flexDirection: "row",
+          }}>
+          {choosedInsurance.insurance.map((d, index) => {
+            return (
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <Button
+                  style={{ marginBottom: 15 }}
+                  key={index + "btn8"}
+                  size='sm'
+                  outline
+                  disabled
+                  color='primary'>
+                  {d}
+                </Button>
+                <Button
+                  key={index + "btn6"}
+                  size='sm'
+                  disabled={showButton}
+                  color='danger'
+                  onClick={() => handleDeleteInsurance(d)}>
+                  <DeleteOutlined />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      </Modal>
+      <Modal
+        title='Enter Barcode'
+        visible={barcodeModalVisible}
+        onOk={handleBarcodeModalOk}
+        destroyOnClose
+        okText={"Add Barcode"}
+        okButtonProps={{ loading: barcodeBtnLoading }}
+        onCancel={() => setBarcodeModalVisible(false)}>
+        <div>
+          <Input
+            placeholder='Enter Barcode'
+            onChange={(e) => setBarcode(e.target.value)}
+          />
+          <p
+            style={{
+              marginTop: 20,
+              fontWeight: 500,
+              textDecoration: "underline",
+            }}>
+            Choose Insurance
+          </p>
+          <Checkbox.Group onChange={handleCheckBox}>
+            <Row>
+              {scannedData?.data?.scannedData[0]?.userId?.assignedButtons?.map(
+                (btn) => {
+                  return (
+                    <Col span={8}>
+                      <Checkbox
+                        value={btn.value}
+                        key={btn._id}
+                        style={{ lineHeight: "32px" }}>
+                        {btn.value}
+                      </Checkbox>
+                    </Col>
+                  );
+                }
+              )}
+            </Row>
+          </Checkbox.Group>
         </div>
       </Modal>
     </>

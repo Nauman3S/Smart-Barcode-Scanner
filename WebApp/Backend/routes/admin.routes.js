@@ -9,6 +9,8 @@ const {
   updateButtons,
   userScannedData,
   getOneUser,
+  updateClaimStatus,
+  userClaimAndBarcodeCount,
 } = controller;
 
 const router = Router();
@@ -47,6 +49,22 @@ router.patch("/update-buttons/:id", updateButtons);
  */
 router.get("/user-scanned-data/:id", userScannedData);
 
+/**
+ * Get One User
+ * @params - {id}
+ */
 router.get("/user/:id", getOneUser);
+
+/**
+ * Update Claim Status
+ * @params - {id}
+ * @body {string} claimStatus
+ */
+router.patch("/update/claim-status/:id", updateClaimStatus);
+
+/**
+ * User Claims and Barcodes Count
+ */
+router.get("/user-count/:id", userClaimAndBarcodeCount);
 
 module.exports = router;

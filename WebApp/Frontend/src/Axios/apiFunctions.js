@@ -99,3 +99,65 @@ export const uploadPhotos = async (photos, id) => {
   });
   return res;
 };
+
+export const updateClaimStatus = async (data) => {
+  const res = await server.patch(
+    `/admin/update/claim-status/${data.id}`,
+    { claimStatus: data.value },
+    {
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+      },
+    }
+  );
+  return res;
+};
+
+export const removePhoto = async (id, photo) => {
+  const res = await server.patch(
+    `/barcode/remove/${id}`,
+    { photo: photo },
+    {
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+      },
+    }
+  );
+  return res;
+};
+
+export const removeInsuracne = async (id, insurance) => {
+  const res = await server.patch(
+    `/barcode/remove-insurance/${id}`,
+    { insurance: insurance },
+    {
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+      },
+    }
+  );
+  return res;
+};
+
+export const scanBarcode = async (barcode, selectedInsurance) => {
+  const res = await server.post(
+    `/barcode/scan/`,
+    { barcode: barcode, buttons: selectedInsurance },
+    {
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+      },
+    }
+  );
+  return res;
+};
+
+export const deleteBarcode = async (id) =>
+  await server.delete(`/barcode/delete/${id}`, {
+    headers: {
+      Authorization: `Bearer ${getToken()}`,
+    },
+  });
+
+export const userCounts = async (userId) =>
+  await server.get(`/admin/user-count/${userId}`);
